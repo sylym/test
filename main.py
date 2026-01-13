@@ -362,7 +362,7 @@ class TiebaSigner:
 
         if not to_sign:
             md = f"## Tieba 签到结果\n\n- 关注：{total}\n- 已签到：{len(already)}\n- 待签到：0（本次无需操作）\n"
-            self.write_step_summary(md)
+            # self.write_step_summary(md)
             return 0
 
         # 第一阶段：适度并发 + 轻抖动
@@ -428,7 +428,7 @@ class TiebaSigner:
                 md_lines.append(f"- ...（共 {len(failed)} 个，已截断）")
 
         md = "\n".join(md_lines) + "\n"
-        self.write_step_summary(md)
+        # self.write_step_summary(md)
 
         # 失败则返回非 0，让 Actions 标红便于关注（你也可以改成永远 0）
         return 1 if failed else 0
