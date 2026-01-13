@@ -1,14 +1,5 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Tieba 自动签到（适合 GitHub Actions / 公共仓库）
-- 连接复用：thread-local requests.Session（并发时避免共享 Session）
-- 限速 + 抖动：降低触发频控概率
-- 分级重试：网络/频控/tbs 失效分别处理；失败项二阶段保守重试
-- 安全：不打印 BDUSS / SCKEY；不输出响应全文；支持写入 Actions Summary
-依赖：requests
-"""
-
 from __future__ import annotations
 
 import hashlib
@@ -114,9 +105,8 @@ def load_config() -> Config:
 
 
 class TiebaSigner:
-    def __init__(self, bduss: str, sckey: str | None, cfg: Config) -> None:
+    def __init__(self, bduss: str, cfg: Config) -> None:
         self.bduss = bduss.strip()
-        self.sckey = (sckey or "").strip()
         self.cfg = cfg
 
         self.log = logging.getLogger("tieba")
@@ -157,7 +147,8 @@ class TiebaSigner:
         base += "tiebaclient!!!"
         return hashlib.md5(base.encode("utf-8")).hexdigest()
 
-    def _sleep_jitter(self, min_delay: float, max_delay: float) -> None:
+    @staticmethod
+    def _sleep_jitter(min_delay: float, max_delay: float) -> None:
         time.sleep(random.uniform(min_delay, max_delay))
 
     def _backoff(self, attempt: int, base: Optional[float] = None) -> float:
@@ -268,12 +259,12 @@ class TiebaSigner:
         return to_sign, already
 
     @staticmethod
-    def _looks_like_login_expired(code: str, msg: str) -> bool:
+    def _looks_like_login_expired(msg: str) -> bool:
         m = (msg or "").lower()
         return ("未登录" in msg) or ("请登录" in msg) or ("login" in m and "need" in m)
 
     @staticmethod
-    def _looks_like_tbs_invalid(code: str, msg: str) -> bool:
+    def _looks_like_tbs_invalid(msg: str) -> bool:
         return "tbs" in (msg or "").lower()
 
     @staticmethod
@@ -281,7 +272,7 @@ class TiebaSigner:
         return ("频繁" in msg) or ("太快" in msg) or ("稍后" in msg) or (code in {"340006", "340007", "340008", "340009"})
 
     @staticmethod
-    def _looks_like_forum_invalid(code: str, msg: str) -> bool:
+    def _looks_like_forum_invalid(msg: str) -> bool:
         m = (msg or "")
         return ("不存在" in m) or ("无此吧" in m) or ("not exist" in m.lower())
 
@@ -317,15 +308,15 @@ class TiebaSigner:
                 return ForumResult(forum=forum, ok=True, code=code, msg=msg, already=True)
 
             # 登录失效：直接终止（继续重试也没意义）
-            if self._looks_like_login_expired(code, msg):
+            if self._looks_like_login_expired(msg):
                 raise RuntimeError(f"登录状态失效：{code} {msg}")
 
             # 吧不存在/无效：不再重试
-            if self._looks_like_forum_invalid(code, msg):
+            if self._looks_like_forum_invalid(msg):
                 return ForumResult(forum=forum, ok=False, code=code, msg=msg, invalid=True)
 
             # tbs 可能失效：刷新后重试
-            if self._looks_like_tbs_invalid(code, msg):
+            if self._looks_like_tbs_invalid(msg):
                 self.log.info("[%s] tbs 可能失效，刷新后重试(%d/%d)", forum, attempt, retries)
                 try:
                     self.refresh_tbs(force=True)
@@ -351,7 +342,8 @@ class TiebaSigner:
 
         return ForumResult(forum=forum, ok=False, code="", msg="exhausted")
 
-    def write_step_summary(self, md: str) -> None:
+    @staticmethod
+    def write_step_summary(md: str) -> None:
         path = os.getenv("GITHUB_STEP_SUMMARY")
         if not path:
             return
@@ -360,28 +352,6 @@ class TiebaSigner:
                 f.write(md.rstrip() + "\n")
         except Exception:
             pass
-
-    def notify_serverchan(self, title: str, desp: str) -> None:
-        """可选：Server酱通知（SCKEY 不存在则跳过）。"""
-        if not self.sckey:
-            return
-        key = self.sckey
-
-        # 新旧版兼容：SCT 开头通常走新域名；否则尝试旧版
-        if key.startswith("SCT"):
-            url = f"https://sctapi.ftqq.com/{key}.send"
-        else:
-            url = f"https://sc.ftqq.com/{key}.send"
-
-        try:
-            s = self._session()
-            s.post(
-                url,
-                data={"title": title, "desp": desp},
-                timeout=(self.cfg.connect_timeout, self.cfg.timeout),
-            )
-        except Exception:
-            self.log.debug("Server酱通知发送失败")
 
     def run(self) -> int:
         self.refresh_tbs(force=True)
@@ -460,10 +430,6 @@ class TiebaSigner:
         md = "\n".join(md_lines) + "\n"
         self.write_step_summary(md)
 
-        # 可选通知
-        title = f"Tieba 签到：成功{len(ok)} 失败{len(failed)}"
-        self.notify_serverchan(title, md)
-
         # 失败则返回非 0，让 Actions 标红便于关注（你也可以改成永远 0）
         return 1 if failed else 0
 
@@ -477,13 +443,11 @@ def main() -> int:
     )
 
     bduss = os.getenv("BDUSS", "").strip()
-    sckey = os.getenv("SCKEY", "").strip()
-
     if not bduss:
         print("错误：未找到 BDUSS 环境变量（请在 GitHub Secrets 中配置）。", file=sys.stderr)
         return 2
 
-    app = TiebaSigner(bduss=bduss, sckey=sckey, cfg=cfg)
+    app = TiebaSigner(bduss=bduss, cfg=cfg)
     return app.run()
 
 
