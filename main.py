@@ -28,16 +28,16 @@ class Config:
     timeout: float = 10.0
 
     # 每次请求前的随机抖动（控制“看起来不像瞬间打满”）
-    min_delay: float = 0.15
-    max_delay: float = 0.35
+    min_delay: float = 1.15
+    max_delay: float = 1.35
 
     # 单吧最大重试次数（遇到频控/网络问题会重试）
     per_forum_retries: int = 3
 
     # 失败项二阶段重试：等待 N 秒后，用更保守的节奏顺序重试
     stage2_wait: int = 60
-    stage2_min_delay: float = 0.6
-    stage2_max_delay: float = 1.2
+    stage2_min_delay: float = 2.6
+    stage2_max_delay: float = 3.2
     stage2_retries: int = 2
 
     # 获取关注列表最大翻页次数（接口是否支持 pn 取决于实际返回；这里做“防重复”保护）
