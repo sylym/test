@@ -203,14 +203,14 @@ class TiebaSigner:
 
             res = self._request_json_retry("GET", TBS_URL, attempts=3)
             if not res:
-                raise RuntimeError("获取 tbs 失败（网络/响应异常）")
+                raise RuntimeError("获取 tbs 失败（网络/响应异常）") from None
 
             if res.get("is_login") != 1:
-                raise RuntimeError("BDUSS 无效或登录状态失效（is_login != 1）")
+                raise RuntimeError("BDUSS 无效或登录状态失效（is_login != 1）") from None
 
             tbs = (res.get("tbs") or "").strip()
             if not tbs:
-                raise RuntimeError("获取 tbs 失败（tbs 为空）")
+                raise RuntimeError("获取 tbs 失败（tbs 为空）") from None
 
             self._tbs = tbs
             self._tbs_ts = now
@@ -229,7 +229,7 @@ class TiebaSigner:
 
             if not isinstance(forums, list) or not forums:
                 if pn == 1:
-                    raise RuntimeError("获取关注列表失败/返回空（可能 BDUSS 失效或接口变更）")
+                    raise RuntimeError("获取关注列表失败/返回空（可能 BDUSS 失效或接口变更）") from None
                 break
 
             new_in_page = 0
@@ -309,7 +309,7 @@ class TiebaSigner:
 
             # 登录失效：直接终止（继续重试也没意义）
             if self._looks_like_login_expired(msg):
-                raise RuntimeError(f"登录状态失效：{code} {msg}")
+                raise RuntimeError(f"登录状态失效") from None
 
             # 吧不存在/无效：不再重试
             if self._looks_like_forum_invalid(msg):
@@ -385,7 +385,7 @@ class TiebaSigner:
                     stage1_results.append(r)
                 except Exception as e:
                     # 登录失效等致命错误：直接失败退出
-                    raise RuntimeError(f"签到线程异常（{name}）：{e}") from e
+                    raise RuntimeError(f"签到线程异常") from None
 
         ok = {r.forum for r in stage1_results if r.ok}
         invalid = {r.forum for r in stage1_results if r.invalid}
@@ -438,7 +438,7 @@ def main() -> int:
     cfg = load_config()
 
     logging.basicConfig(
-        level=logging.DEBUG if cfg.debug else logging.INFO,
+        level=logging.DEBUG if cfg.debug else logging.ERROR,
         format="%(asctime)s %(levelname)s %(message)s",
     )
 

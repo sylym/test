@@ -20,8 +20,11 @@ jobs:
   sign:
     # 仅 workflow_dispatch 或“每日 cron”执行（避免每月 keepalive 那次也跑一遍签到）
     if: |
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'schedule' && github.event.schedule == '10 0 * * *')
+      github.ref == 'refs/heads/master' &&
+      (
+        github.event_name == 'workflow_dispatch' ||
+        (github.event_name == 'schedule' && github.event.schedule == '10 0 * * *')
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
