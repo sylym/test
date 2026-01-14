@@ -25,7 +25,7 @@ jobs:
       github.ref == 'refs/heads/master' &&
       (
         github.event_name == 'workflow_dispatch' ||
-        (github.event_name == 'schedule' && github.event.schedule == '10 0 * * *')
+        (github.event_name == 'schedule' && github.event.schedule != '25 0 1 * *')
       )
     runs-on: ubuntu-latest
     timeout-minutes: 15
